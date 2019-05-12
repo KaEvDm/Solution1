@@ -35,22 +35,49 @@ namespace UserInterface
             gameForm.Show();
 
             Hide();
-            gameForm.FormClosed += (object s, FormClosedEventArgs ev) => 
+            gameForm.FormClosed += (object s, FormClosedEventArgs ev) =>
             {
+                gameThread.Join();
                 user.Money = player.Money;
+                UserMoneyLabel.Text = user.Money.ToString();
                 Show();
-                game.End();
-                gameThread.Abort();
-                gameThread.Join();                
                 userLoader.Save(user);
-                
+            };
+
+            gameForm.FormClosing += (object s, FormClosingEventArgs ev) =>
+            {
+                if (ev.CloseReason == CloseReason.UserClosing)
+                {
+                    if (game.CurrentRound.CurrentBatch.Player.Equals(player))
+                    {
+                        if (game.CurrentRound.CurrentBatch.Bet != 0)
+                        {
+                            var msg = "Вашу ставку заберет банкир.Вы уверены что хотите покинуть игру?";
+                            var capture = "выход";
+                            var result = MessageBox.Show(msg, capture, MessageBoxButtons.YesNo);
+                            if (result == DialogResult.Yes)
+                            {
+                                //player.Money -= game.CurrentRound.CurrentBatch.Bet;
+                                //game.banker.Money += game.CurrentRound.CurrentBatch.Bet;
+                                ev.Cancel = false;                                
+                                //gameForm.Dispose(); из за диспоза он теряет монеты в два раза больше.                                
+                            }
+                            else
+                            {
+                                ev.Cancel = true;
+                            }
+                        }
+                    }
+                    game.cancelTokenSource.Cancel();
+                    game.End();
+                }
             };
         }
 
         private void ChangeNameButton_Click(object sender, EventArgs e)
         {
             var input = PlayerNameTextBox.Text;
-            
+
             if (string.IsNullOrEmpty(input))
             {
                 MessageBox.Show("Неккоректный ввод!");
@@ -58,6 +85,7 @@ namespace UserInterface
             }
 
             user.Name = PlayerNameTextBox.Text;
+            user.Money = DefaultUserMoney;
             UpdateUserInfo();
 
             PlayerNameTextBox.Clear();
@@ -83,7 +111,6 @@ namespace UserInterface
 
             user = tempUser;
             UpdateUserInfo();
-            
         }
 
         private void ConnectButten_Click(object sender, EventArgs e)

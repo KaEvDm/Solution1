@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Table
@@ -11,23 +12,28 @@ namespace Table
         private List<AbsPlayer> players;
         private Banker banker;
 
+        private event Action batchStart;
+        private event Action<string> batchEnd;
+
         public Batch CurrentBatch { get; private set; }
 
-        public Round(List<AbsPlayer> players, Banker banker)
+        public Round(List<AbsPlayer> players, Banker banker, Action batchStart, Action<string> batchEnd)
         {
             this.players = players;
             this.banker = banker;
+            this.batchStart = batchStart;
+            this.batchEnd = batchEnd;
         }
 
-        public void Start()
+        public void Start(CancellationToken сancelationToken)
         {
-            foreach(var player in players)
+            foreach (var player in players)
             {
                 banker.Give(player, 2);
                 banker.Give(banker, 2);
-                CurrentBatch = new Batch(banker, (Player)players.First());
-                CurrentBatch.Start();
-            }          
+                CurrentBatch = new Batch(banker, (Player)players.First(), batchStart, batchEnd);
+                CurrentBatch.Start(сancelationToken);
+            }
         }
     }
 }

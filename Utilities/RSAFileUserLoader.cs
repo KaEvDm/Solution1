@@ -14,23 +14,28 @@ namespace Utilities
         {
             var keysPath = (path ?? AppDomain.CurrentDomain.BaseDirectory) + "keys.txt";
             usersFolderPath = (path ?? AppDomain.CurrentDomain.BaseDirectory) + "UsersData\\";
-            
+
             GetKeys(keysPath);
         }
 
         public User Load(string name)
         {
             var fullPath = usersFolderPath + name + ".txt";
-
-            using (var reader = new StreamReader(fullPath))
+            try
             {
-                // Чтение зашифрованной строки из файла
-                var encryptedString = reader.ReadLine();
+                using (var reader = new StreamReader(fullPath))
+                {
+                    var encryptedString = reader.ReadLine();
 
-                // расшифровка
-                var decryptedString = Decrypt(encryptedString);
+                    // расшифровка
+                    var decryptedString = Decrypt(encryptedString);
 
-                return new User(name, int.Parse(decryptedString));
+                    return new User(name, int.Parse(decryptedString));
+                }
+            }
+            catch
+            {
+                return null;
             }
         }
 
@@ -53,7 +58,10 @@ namespace Utilities
         public string Encrypt(string str)
         {
             // данные которые нужно зашифровать
-            byte[] bytes = Convert.FromBase64String(str);
+            //var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier:false, throwOnInvalidBytes:true);
+            byte[] bytesStr = Encoding.Default.GetBytes(str);
+            var str1 = Convert.ToBase64String(bytesStr);
+            byte[] bytes = Convert.FromBase64String(str1);
             byte[] encryptedByets;
 
             using (var rsa = new RSACryptoServiceProvider())
@@ -67,12 +75,14 @@ namespace Utilities
 
             // зашифрованная строка
             return Convert.ToBase64String(encryptedByets);
+            //return Encoding.Default.GetString(encryptedByets);
         }
 
         public string Decrypt(string encryptedString)
         {
             // зашифрованные данные
             byte[] encryptedByets = Convert.FromBase64String(encryptedString);
+            //byte[] encryptedByets = Encoding.UTF8.GetBytes(encryptedString); 
             byte[] decriptedBytes;
 
             using (var rsa = new RSACryptoServiceProvider())
@@ -85,7 +95,10 @@ namespace Utilities
             }
 
             // расшифрованная строка
-            return Convert.ToBase64String(decriptedBytes);
+
+            var str = Convert.ToBase64String(decriptedBytes);
+            return Encoding.UTF8.GetString(Convert.FromBase64String(str));
+            //return Encoding.Default.GetString(decriptedBytes);
         }
 
         public void CreateKeys(string path)

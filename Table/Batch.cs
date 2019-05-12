@@ -10,50 +10,72 @@ namespace Table
     public class Batch
     {
         private Banker banker;
-        private AbsPlayer player;
+        public Player Player { get; set; }
         public int Bet { get; set; }
-        public event Action<string> BatchEnd;
 
-        public Batch(Banker banker, AbsPlayer player)
+        public event Action batchStart;
+        public event Action<string> batchEnd;
+
+        public Batch(Banker banker, Player player, Action batchStart, Action<string> batchEnd)
         {
             this.banker = banker;
-            this.player = player;
+            this.Player = player;
+            this.batchStart = batchStart;
+            this.batchEnd = batchEnd;
         }
 
-        public void Start()
+        public void Start(CancellationToken cancelationToken)
         {
-            PlayerTakes();
-            BankerTakes();
+            while(Bet == 0)
+            {
+                Thread.Sleep(5);
+            }
 
-            var winner = DefineWinner();
-            BatchEnd.Invoke(winner.ToString());
+            batchStart.Invoke();
+            PlayerTakes(cancelationToken);
+            BankerTakes(cancelationToken);
 
-            banker.BeatenDeck.AddRange(player.Hand);
-            player.Hand.Clear();
+            var winner = DefineWinner(cancelationToken);
+
+            if (!cancelationToken.IsCancellationRequested)
+            {
+                batchEnd.Invoke(winner.ToString());
+            }
+
+            banker.BeatenDeck.AddRange(Player.Hand);
+            Player.Hand.Clear();
             banker.BeatenDeck.AddRange(banker.Hand);
             banker.Hand.Clear();
         }
 
-        public void BankerTakes()
+        public void BankerTakes(CancellationToken cancelationToken)
         {
-            while (!banker.IsStand)
+            while (!banker.IsStand && !cancelationToken.IsCancellationRequested)
             {
                 banker.Take(banker);
             }
         }
 
-        public void PlayerTakes()
+        public void PlayerTakes(CancellationToken cancelationToken)
         {
-            while (!player.IsStand)
+            while (!Player.IsStand && !cancelationToken.IsCancellationRequested)
             {
                 Thread.Sleep(5);
             }
-            player.IsStand = false;
+            lock (Player.locker)
+            {
+                Player.IsStand = false;
+            }
         }
 
-        public AbsPlayer DefineWinner()
+        public AbsPlayer DefineWinner(CancellationToken cancelationToken)
         {
-            if (player.Score > 21)
+            if (cancelationToken.IsCancellationRequested)
+            {
+                return BankerWin();
+            }
+
+            if (Player.Score > 21)
             {
                 return BankerWin();
             }
@@ -63,24 +85,24 @@ namespace Table
                 return PlayerWin();
             }
 
-            switch (banker.Score.CompareTo(player.Score))
+            switch (banker.Score.CompareTo(Player.Score))
             {
                 case -1:
                 case 0:
-                {
-                    return PlayerWin();
-                }
+                    {
+                        return PlayerWin();
+                    }
                 case 1:
-                {
-                    return BankerWin();
-                }
+                    {
+                        return BankerWin();
+                    }
             }
             return null;
         }
 
         private AbsPlayer BankerWin()
         {
-            player.Money -= Bet;
+            Player.Money -= Bet;
             banker.Money += Bet;
             return banker;
         }
@@ -88,8 +110,8 @@ namespace Table
         private AbsPlayer PlayerWin()
         {
             banker.Money -= Bet;
-            player.Money += Bet;
-            return player;
+            Player.Money += Bet;
+            return Player;
         }
     }
 }

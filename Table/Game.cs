@@ -9,36 +9,46 @@ namespace Table
 {
     public class Game
     {
+        public CancellationTokenSource cancelTokenSource = new CancellationTokenSource();
+        private CancellationToken token;
+
         private readonly int InitialBank;
         public Banker banker;
         public List<AbsPlayer> players;
         public int id;
         public Round CurrentRound;
-        
-        
 
         private bool isEnd;
         private bool BankerBankrupt => banker.Money == 0;
         private bool AllPlayersBankrupt => players.All(p => p.Money <= 0);
         private bool BankerBankTooBig => banker.Money == InitialBank * 3;
 
+        public event Action BatchStart;
+        public event Action<string> BatchEnd;
 
         public Game(AbsPlayer host)
         {
-            banker = new Banker();
+            BatchStart += (() => { });
+            BatchEnd += ((s) => { });
+
+            token = cancelTokenSource.Token;
+
+            id = new Random().Next();
+            InitialBank = host.Money;
+
             players = new List<AbsPlayer>();
             players.Add(host);
-            id = new Random().Next();
+
+            banker = new Banker();
             banker.Money = host.Money * 2;
-            InitialBank = host.Money;
         }
         
         public void Start()
         {
-            while(!isEnd || !BankerBankrupt || !AllPlayersBankrupt || !BankerBankTooBig)
+            while(!isEnd && !BankerBankrupt && !AllPlayersBankrupt && !BankerBankTooBig)
             {
-                CurrentRound = new Round(players, banker);
-                CurrentRound.Start();
+                CurrentRound = new Round(players, banker, BatchStart, BatchEnd);
+                CurrentRound.Start(token);
             }
         }
 
